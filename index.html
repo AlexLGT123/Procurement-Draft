@@ -7,11 +7,16 @@
     <title>ProcurementDraft IA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      /* Prevent layout shift when scrollbar appears */
+      html, body {
+        overflow: hidden;
+        height: 100%;
+        width: 100%;
+      }
+
       html {
-        overflow-y: scroll;
-        scrollbar-width: thin; /* For Firefox */
-        scrollbar-color: #4B5563 #1A1A1A; /* For Firefox */
+        /* Custom scrollbar for Firefox */
+        scrollbar-width: thin;
+        scrollbar-color: #4B5563 #1A1A1A;
       }
 
       /* Custom scrollbar for webkit browsers */
@@ -29,6 +34,15 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #6B7280;
       }
+
+      /* Helper class to hide scrollbars */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none; /* For Chrome, Safari, and Opera */
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;  /* For Internet Explorer and Edge */
+        scrollbar-width: none;  /* For Firefox */
+      }
       
       @keyframes highlight-fade-in {
         from { background-color: rgba(127, 86, 217, 0); }
@@ -42,6 +56,24 @@
         padding: 0 2px;
         animation: highlight-fade-in 0.5s ease-in-out;
         transition: background-color 0.5s ease-out;
+      }
+
+      @keyframes modal-backdrop-fade-in {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+
+      @keyframes modal-content-fade-in {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
+      }
+
+      .modal-backdrop-animate {
+        animation: modal-backdrop-fade-in 0.2s ease-out forwards;
+      }
+
+      .modal-content-animate {
+        animation: modal-content-fade-in 0.2s ease-out forwards;
       }
     </style>
   <script type="importmap">

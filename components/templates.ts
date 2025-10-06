@@ -1,3 +1,4 @@
+
 import type { Template } from '../types';
 
 const RFP_TEMPLATE = `<h1>Request for Proposal (RFP)</h1>
@@ -391,27 +392,27 @@ const NDA_TEMPLATE = `<h1>Mutual Non-Disclosure Agreement (NDA)</h1>
 
 export const TEMPLATES: Template[] = [
     {
-        key: 'RFP',
-        name: 'Request for Proposal',
-        description: 'A comprehensive template to solicit detailed proposals for a specific project, outlining scope, requirements, and evaluation criteria.',
+        key: 'rfp',
+        name: 'templates.rfp.name',
+        description: 'templates.rfp.description',
         content: RFP_TEMPLATE,
     },
     {
-        key: 'RFQ',
-        name: 'Request for Quotation',
-        description: 'A streamlined template to gather competitive pricing for specific goods or services with detailed specifications.',
+        key: 'rfq',
+        name: 'templates.rfq.name',
+        description: 'templates.rfq.description',
         content: RFQ_TEMPLATE,
     },
     {
-        key: 'RFI',
-        name: 'Request for Information',
-        description: 'A formal template to explore vendor capabilities and gather general information about solutions in the market.',
+        key: 'rfi',
+        name: 'templates.rfi.name',
+        description: 'templates.rfi.description',
         content: RFI_TEMPLATE,
     },
     {
-        key: 'NDA',
-        name: 'Non-Disclosure Agreement',
-        description: 'A robust, legally-binding agreement to protect sensitive information shared between two parties.',
+        key: 'nda',
+        name: 'templates.nda.name',
+        description: 'templates.nda.description',
         content: NDA_TEMPLATE,
     },
 ];

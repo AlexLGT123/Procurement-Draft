@@ -1,0 +1,178 @@
+
+export const fr = {
+  common: {
+    or: 'ou',
+    thinking: 'Réflexion...',
+    runningFor: 'En cours... {{seconds}}s',
+  },
+  header: {
+    title: 'ProcurementDraft',
+    templates: 'Modèles',
+    saveDraft: 'Sauvegarder',
+    history: 'Historique',
+    export: 'Exporter DOCX',
+    saving: 'Sauvegarde...',
+    saved: 'Modifications sauvegardées',
+    landingPageAria: "Aller à la page d'accueil",
+  },
+  chat: {
+    title: 'Chat',
+    subtitle: "Indiquez à l'IA comment construire votre document.",
+    placeholder: 'Ex: Ajoutez une conclusion résumant les points clés...',
+    initialWelcome: 'Bienvenue sur ProcurementDraft IA. Veuillez sélectionner un modèle ou commencer avec un document vierge.',
+    welcomeBack: "Content de vous revoir ! J'ai chargé votre dernière session.",
+    templateLoaded: "J'ai chargé le modèle {{templateName}}. Utilisez le chat pour construire votre document.",
+    startedBlank: 'Nous partons de zéro. Que devrions-nous créer en premier ?',
+    importedFile: "J'ai importé et converti {{fileName}}. Au travail !",
+    documentUpdated: "J'ai mis à jour le document. Les modifications sont surlignées.",
+    documentRefined: "J'ai affiné vos récentes modifications. Les changements sont surlignées.",
+    restoredVersion: 'Document restauré à la version de "{{documentTitle}}" enregistrée le {{date}}.',
+    errorPrefix: "Désolé, je n'ai pas pu traiter cela.",
+    errorOccurred: 'Une erreur est survenue : {{errorMessage}}',
+    placeholdersHint: "J'ai surligné en rouge les sections qui nécessitent votre attention. Veuillez les compléter avant d'exporter.",
+    clearChatAria: "Effacer l'historique du chat",
+    guidedMode: {
+      label: 'Mode Guidé',
+      description: "L'IA posera des questions pour aider à créer le document.",
+      activated: "Le Mode Guidé est activé. Je vais maintenant vous guider pour compléter le document.",
+      error: "Désolé, je n'ai pas pu générer de question guide pour le moment.",
+    },
+  },
+  editor: {
+    title: 'Éditeur de Document',
+    subtitle: 'Modifiez votre document directement. Utilisez la barre d\'outils pour la mise en forme.',
+    newDocumentTitle: 'Nouveau Document',
+    startWriting: 'Commencez à écrire ici...',
+    refine: {
+      aiAssistant: 'Assistant IA',
+      prompt: 'Affiner vos modifications pour plus de clarté et d\'impact ?',
+      button: 'Affiner avec l\'IA',
+      dismissAria: "Rejeter la suggestion de l'IA",
+      refining: 'Raffinage...',
+    },
+    placeholderTooltip: 'Cette section doit être remplie.',
+  },
+  templates: {
+    subtitle: 'Votre partenaire intelligent pour créer des documents structurés et professionnels. Commencez avec un modèle ou importez votre travail.',
+    chooseStartPoint: 'Choisissez un point de départ',
+    importing: 'Importation...',
+    importFromFile: 'Importer un fichier',
+    startBlank: 'Commencer avec un document vierge',
+    faqLink: 'FAQ & Confidentialité',
+    rfp: {
+      name: 'Appel d\'offres (RFP)',
+      description: 'Un modèle complet pour solliciter des propositions détaillées pour un projet, décrivant la portée, les exigences et les critères d\'évaluation.',
+    },
+    rfq: {
+      name: 'Demande de devis (RFQ)',
+      description: 'Un modèle simple pour recueillir des prix compétitifs pour des biens ou services spécifiques avec des spécifications détaillées.',
+    },
+    rfi: {
+      name: 'Demande d\'information (RFI)',
+      description: 'Un modèle formel pour explorer les capacités des fournisseurs et recueillir des informations générales sur les solutions du marché.',
+    },
+    nda: {
+      name: 'Accord de non-divulgation (NDA)',
+      description: 'Un accord juridiquement contraignant et robuste pour protéger les informations sensibles partagées entre deux parties.',
+    },
+  },
+  history: {
+    modalTitle: 'Historique des activités',
+    closeAria: "Fermer l'historique",
+    noActivity: "Aucune activité n'a encore été enregistrée.",
+    restoreButton: 'Restaurer',
+    restoreAria: 'Restaurer la version du {{date}}',
+    draftSaved: {
+      manual: {
+        title: 'Brouillon enregistré',
+      },
+      auto: {
+        title: 'Sauvegarde automatique',
+      },
+      description: '"{{documentTitle}}" a été sauvegardé.',
+    },
+    templateLoaded: {
+      title: 'Modèle chargé',
+      description: 'Nouveau document créé à partir du modèle "{{templateName}}".',
+    },
+    startedBlank: {
+      title: 'Nouveau document',
+      description: 'Création d\'un nouveau document vierge.',
+    },
+    imported: {
+      title: 'Fichier importé',
+      description: 'Importation de "{{fileName}}".',
+    },
+    exported: {
+      title: 'Exporté en DOCX',
+      description: 'Exportation de "{{documentTitle}}" en DOCX.',
+    },
+    restored: {
+      title: 'Document restauré',
+      description: 'Version restaurée : "{{documentTitle}}".',
+    },
+    unknown: {
+      title: 'Événement inconnu',
+    },
+  },
+  toolbar: {
+    bold: 'Gras',
+    italic: 'Italique',
+    underline: 'Souligné',
+    strikethrough: 'Barré',
+    bulletList: 'Liste à puces',
+    numberedList: 'Liste numérotée',
+    quote: 'Citation',
+    clearFormatting: 'Effacer la mise en forme',
+    paragraph: 'Paragraphe',
+    heading1: 'Titre 1',
+    heading2: 'Titre 2',
+    heading3: 'Titre 3',
+    blockTypeAria: 'Sélectionner le style du bloc de texte',
+  },
+  errors: {
+    fileReadFailed: 'Échec de la lecture du fichier.',
+    docxConversionFailed: 'Échec de la conversion de {{fileName}}. Le fichier est peut-être corrompu.',
+    docNotSupported: 'Désolé, les fichiers .doc ne sont pas pris en charge. Veuillez enregistrer le fichier en .docx et réessayer.',
+    unsupportedFileType: "Désolé, seuls les fichiers .md, .txt et .docx peuvent être importés pour le moment.",
+    exportFailed: "Échec de l'exportation du document en .docx.",
+    restoreNoContent: "Ce point de l'historique ne peut pas être restauré car il n'a pas de contenu sauvegardé.",
+  },
+  time: {
+    yearsAgo: 'Il y a {{count}} ans',
+    monthsAgo: 'Il y a {{count}} mois',
+    daysAgo: 'Il y a {{count}} jours',
+    hoursAgo: 'Il y a {{count}} heures',
+    minutesAgo: 'Il y a {{count}} minutes',
+    justNow: "À l'instant",
+  },
+  faq: {
+    modalTitle: 'Foire Aux Questions',
+    closeAria: 'Fermer la FAQ',
+    items: [
+      {
+        q: 'Comment sont utilisées mes données ?',
+        a: "Le contenu de votre document et vos messages de chat sont envoyés à l'API Gemini uniquement pour répondre à vos demandes, comme la mise à jour du document ou vos questions. Nous n'utilisons pas vos données pour entraîner nos modèles ou à toute autre fin.",
+      },
+      {
+        q: 'Mes données sont-elles stockées ? Où ?',
+        a: "L'application utilise le stockage local de votre navigateur pour sauvegarder automatiquement votre session. Cela signifie que votre travail est stocké directement sur votre ordinateur, et non sur nos serveurs. Si vous effacez les données de votre navigateur, votre session sera perdue. Nous n'avons pas de base de données centrale stockant les documents des utilisateurs.",
+      },
+      {
+        q: 'Qui a accès à mes données ?',
+        a: "Seul vous avez accès aux données stockées dans le stockage local de votre navigateur. Le contenu est envoyé de manière sécurisée via HTTPS à l'API Gemini pour traitement, mais il n'est pas stocké de manière permanente ni accessible par des examinateurs humains, sauf si requis pour des raisons légales ou de sécurité, comme le stipulent les conditions d'utilisation de l'API.",
+      },
+      {
+        q: "Comment assurez-vous la confidentialité de mes documents ?",
+        a: "Votre vie privée est notre priorité. L'application est conçue pour que les données sensibles de vos documents résident sur votre propre machine. Toute communication avec le service d'IA est chiffrée en transit. Nous n'avons aucun accès à vos documents, et ils ne sont utilisés à aucune autre fin que de fournir les fonctionnalités d'IA de cet outil.",
+      },
+    ],
+  },
+  confirmation: {
+    title: 'Modifications non enregistrées',
+    message: 'Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter ? Vos modifications seront perdues.',
+    confirm: 'Confirmer',
+    cancel: 'Annuler',
+    confirmLeave: 'Quitter la page',
+  },
+};

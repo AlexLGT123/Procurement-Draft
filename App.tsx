@@ -1,19 +1,16 @@
 
 import React, { useState, useCallback, useEffect, useRef, lazy, Suspense } from 'react';
-import { Header } from './components/Header';
-import { ChatInterface } from './components/ChatInterface';
-import { DocumentEditor } from './components/DocumentEditor';
 import { TemplateLibrary } from './components/TemplateLibrary';
 import type { ChatMessage, Template, HistoryEntry } from './types';
 import { MessageSender, HistoryEventType } from './types';
-import { generateDocumentUpdate, refineDocumentSection } from './services/geminiService';
-import { TEMPLATES } from './components/templates';
+import { generateDocumentUpdate, refineDocumentSection, generateGuidingQuestions } from './services/geminiService';
+import { useTranslation } from './hooks/useTranslation';
+import { LOCAL_STORAGE_KEY, HISTORY_STORAGE_KEY } from './constants';
+import { ConfirmationModal } from './components/ConfirmationModal';
 
-// Lazy load the modal component
-const HistoryLogModal = lazy(() => import('./components/HistoryLogModal').then(module => ({ default: module.HistoryLogModal })));
+const EditorView = lazy(() => import('./components/EditorView'));
 
 
-// Declarations for CDN libraries
 declare var htmlDocx: any;
 declare var saveAs: any;
 declare var mammoth: any;
@@ -21,390 +18,339 @@ declare var DOMPurify: any;
 
 type AppView = 'templates' | 'editor';
 type SaveStatus = 'idle' | 'saving' | 'saved';
-
-const LOCAL_STORAGE_KEY = 'procurementdraft_autosave';
-const HISTORY_STORAGE_KEY = 'procurementdraft_history';
+interface ConfirmationState {
+    title: string;
+    message: string;
+    confirmText?: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+}
 
 const getDocumentTitle = (htmlContent: string): string => {
-  if (!htmlContent) return 'Untitled Document';
-  const tempDiv = document.createElement('div');
-  tempDiv.innerHTML = htmlContent;
-  const firstH1 = tempDiv.querySelector('h1');
-  if (firstH1 && firstH1.textContent) {
-      return firstH1.textContent.trim();
-  }
-  const firstLine = (tempDiv.textContent || '').trim().split('\n')[0];
-  return firstLine || 'Untitled Document';
+    if (!htmlContent) return 'Untitled Document';
+    const h1Match = htmlContent.match(/<h1[^>]*>(.*?)<\/h1>/i);
+    if (h1Match && h1Match[1]) {
+        const tempEl = document.createElement('span');
+        tempEl.innerHTML = h1Match[1];
+        const decodedTitle = tempEl.textContent || '';
+        if (decodedTitle.trim()) return decodedTitle.trim();
+    }
+    const textContent = htmlContent.replace(/<[^>]+>/g, '').trim();
+    const firstLine = textContent.split('\n')[0];
+    return firstLine || 'Untitled Document';
 };
 
+const getLoadingMessageFromPrompt = (prompt: string): string => {
+    const p = prompt.toLowerCase();
+    const actions: { [key: string]: string } = { add: 'Adding', create: 'Creating', write: 'Writing', insert: 'Inserting', generate: 'Generating', draft: 'Drafting', summarize: 'Summarizing', update: 'Updating', change: 'Changing', rephrase: 'Rephrasing', improve: 'Improving' };
+    const subjects: { [key: string]: string } = { section: 'section', paragraph: 'paragraph', conclusion: 'conclusion', introduction: 'introduction', summary: 'summary', list: 'list', table: 'table', clause: 'clause', title: 'title', heading: 'heading' };
+    let foundAction = '';
+    for (const key in actions) if (p.includes(key)) { foundAction = actions[key]; break; }
+    let foundSubject = '';
+    for (const key in subjects) if (p.includes(key)) { foundSubject = subjects[key]; break; }
+    if (foundAction && foundSubject) return `${foundAction} ${foundSubject}...`;
+    if (foundAction) return `${foundAction} content...`;
+    return 'Processing request...';
+};
+
+const highlightPlaceholders = (html: string, tooltipText: string): string => {
+  return html.replace(/\[([^\[\]]+)\]/g, (match) => {
+    return `<span class="placeholder-highlight" title="${tooltipText}">${match}</span>`;
+  });
+};
+
+
 const App: React.FC = () => {
-  const [view, setView] = useState<AppView>('templates');
-  const [documentContent, setDocumentContent] = useState<string>('');
-  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
-  const [hasUnrefinedEdits, setHasUnrefinedEdits] = useState<boolean>(false);
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
-  
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([
-    {
-      id: 'initial-bot-message',
-      sender: MessageSender.BOT,
-      text: "Welcome to ProcurementDraft IA. Please select a template or start with a blank document.",
-    },
-  ]);
-  
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [isImporting, setIsImporting] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  const isInitialMount = useRef(true);
-  
-  const updateDocument = useCallback((content: string, fromUser: boolean) => {
-    setDocumentContent(content);
-    setSaveStatus('saving');
-    if (fromUser) {
-        setHasUnrefinedEdits(true);
-    }
-  }, []);
+    const { t, language } = useTranslation();
+    const [view, setView] = useState<AppView>('templates');
+    const [documentContent, setDocumentContent] = useState<string>('');
+    const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
+    const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+    const [hasUnrefinedEdits, setHasUnrefinedEdits] = useState(false);
+    const [history, setHistory] = useState<HistoryEntry[]>([]);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const [isGuidedMode, setIsGuidedMode] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const [loadingMessage, setLoadingMessage] = useState('');
+    const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
 
-  const logHistoryEvent = useCallback((type: HistoryEventType, docContent: string, details?: string) => {
-    const newEntry: HistoryEntry = {
-        id: `hist-${Date.now()}`,
-        type,
-        timestamp: Date.now(),
-        documentTitle: getDocumentTitle(docContent),
-        details,
-    };
+    const saveTimeoutRef = useRef<number | null>(null);
 
-    setHistory(prevHistory => {
-        const updatedHistory = [newEntry, ...prevHistory].slice(0, 50); // Keep latest 50
-        localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updatedHistory));
-        return updatedHistory;
-    });
-  }, []);
+    const addHistoryEntry = useCallback((type: HistoryEventType, details?: string) => {
+        setHistory(prev => {
+            const newEntry: HistoryEntry = { id: `${type}-${Date.now()}`, type, timestamp: Date.now(), documentTitle: getDocumentTitle(documentContent), documentContent, details };
+            if (type === HistoryEventType.DRAFT_SAVED && details !== 'Manual Save') {
+                const lastEntry = prev[0];
+                if (lastEntry && lastEntry.type === HistoryEventType.DRAFT_SAVED && lastEntry.documentContent === newEntry.documentContent) return prev;
+            }
+            const updatedHistory = [newEntry, ...prev].slice(0, 50);
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updatedHistory));
+            return updatedHistory;
+        });
+    }, [documentContent]);
 
-  // Load content and history from localStorage on initial render
-  useEffect(() => {
-    const savedContent = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (savedContent && savedContent.trim() !== '') {
-      setDocumentContent(DOMPurify.sanitize(savedContent));
-      setChatHistory([
-        {
-          id: `bot-autosave-${Date.now()}`,
-          sender: MessageSender.BOT,
-          text: "Welcome back! I've loaded your last saved session.",
-        },
-      ]);
-      setView('editor');
-    }
-
-    const savedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
-    if (savedHistory) {
-        try {
-            setHistory(JSON.parse(savedHistory));
-        } catch (e) {
-            console.error("Failed to parse history from localStorage", e);
-            setHistory([]);
-        }
-    }
-  }, []); // Run only on mount
-
-  // Auto-save document content to localStorage
-  useEffect(() => {
-    if (view === 'editor') {
-        if (isInitialMount.current) {
-            isInitialMount.current = false;
-            return;
-        }
-
-        if (saveStatus === 'saving') {
-            const handler = setTimeout(() => {
-                localStorage.setItem(LOCAL_STORAGE_KEY, documentContent);
-                setSaveStatus('saved');
-                
-                const lastSave = history.find(h => h.type === HistoryEventType.DRAFT_SAVED);
-                if (!lastSave || (Date.now() - lastSave.timestamp > 5 * 60 * 1000)) { // 5 minutes
-                    logHistoryEvent(HistoryEventType.DRAFT_SAVED, documentContent, 'Auto-save');
-                }
-            }, 1500); // Debounce time
-
-            return () => clearTimeout(handler);
-        }
-    }
-  }, [documentContent, saveStatus, view, logHistoryEvent, history]);
-
-  // Effect to revert "saved" status to "idle" for a clean UI
-  useEffect(() => {
-    if (saveStatus === 'saved') {
-        const timer = setTimeout(() => {
-            setSaveStatus('idle');
-        }, 2000);
-        return () => clearTimeout(timer);
-    }
-  }, [saveStatus]);
-
-  // Effect to clear AI highlight tags after 10 seconds
-  useEffect(() => {
-    if (documentContent.includes('<mark')) {
-      const timer = setTimeout(() => {
-        setDocumentContent(currentContent => currentContent.replace(/<mark[^>]*>|<\/mark>/g, ''));
-      }, 10000);
-      return () => clearTimeout(timer);
-    }
-  }, [documentContent]);
-
-  const handleSendMessage = useCallback(async (message: string) => {
-    if (!message.trim() || isLoading) return;
-
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      sender: MessageSender.USER,
-      text: message,
-    };
-    
-    setHasUnrefinedEdits(false);
-    setChatHistory(prev => [...prev, userMessage]);
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      // The AI will now return the document with <mark> tags around changes
-      const updatedDocument = await generateDocumentUpdate(documentContent.replace(/<mark[^>]*>|<\/mark>/g, ''), message);
-      updateDocument(DOMPurify.sanitize(updatedDocument), false);
-
-      const botMessage: ChatMessage = {
-        id: `bot-${Date.now()}`,
-        sender: MessageSender.BOT,
-        text: "I've updated the document. Changes are highlighted.",
-      };
-      setChatHistory(prev => [...prev, botMessage]);
-
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-      setError(`Sorry, I couldn't process that. ${errorMessage}`);
-      const botErrorMessage: ChatMessage = {
-        id: `bot-error-${Date.now()}`,
-        sender: MessageSender.BOT,
-        text: `An error occurred: ${errorMessage}`,
-      };
-      setChatHistory(prev => [...prev, botErrorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isLoading, documentContent, updateDocument]);
-
-  const handleSelectTemplate = (template: Template) => {
-    updateDocument(DOMPurify.sanitize(template.content), false);
-    logHistoryEvent(HistoryEventType.TEMPLATE_LOADED, template.content, template.name);
-    setHasUnrefinedEdits(false);
-    setChatHistory([
-      {
-        id: `bot-template-${Date.now()}`,
-        sender: MessageSender.BOT,
-        text: `I've loaded the ${template.name} template. Use the chat to build your document.`,
-      },
-    ]);
-    setView('editor');
-  };
-  
-  const handleStartBlank = () => {
-    const blankContent = `<h1>New Document</h1><p>Start writing here...</p>`;
-    updateDocument(DOMPurify.sanitize(blankContent), false);
-    logHistoryEvent(HistoryEventType.STARTED_BLANK, blankContent);
-    setHasUnrefinedEdits(false);
-    setChatHistory([
-      {
-        id: `bot-blank-${Date.now()}`,
-        sender: MessageSender.BOT,
-        text: "Starting with a blank slate. What should we create first?",
-      },
-    ]);
-    setView('editor');
-  };
-
-  const handleFileImport = (file: File) => {
-    const reader = new FileReader();
-    reader.onloadstart = () => setIsImporting(true);
-    reader.onerror = () => {
-        setError("Failed to read the file.");
-        setIsImporting(false);
-    };
-
-    const processImportSuccess = (html: string) => {
-      updateDocument(DOMPurify.sanitize(html), false);
-      logHistoryEvent(HistoryEventType.IMPORTED, html, file.name);
-      setHasUnrefinedEdits(false);
-      setChatHistory([
-        {
-          id: `bot-import-${Date.now()}`,
-          sender: MessageSender.BOT,
-          text: `I've imported and converted ${file.name}. Let's get to work!`,
-        },
-      ]);
-      setView('editor');
-    };
-    
-    const cleanFileName = file.name.replace(/\.[^/.]+$/, "");
-    const fileName = file.name.toLowerCase();
-
-    if (fileName.endsWith('.md') || fileName.endsWith('.txt')) {
-      reader.onload = (event) => {
-        const text = event.target?.result as string;
-        const html = `<h1>${cleanFileName}</h1><p>${text.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
-        processImportSuccess(html);
-        setIsImporting(false);
-      };
-      reader.readAsText(file);
-    } else if (fileName.endsWith('.docx')) {
-      reader.onload = (event) => {
-        const arrayBuffer = event.target?.result as ArrayBuffer;
-        mammoth.convertToHtml({ arrayBuffer: arrayBuffer })
-          .then((result: { value: string; messages: any[] }) => {
-            const html = `<h1>${cleanFileName}</h1>${result.value}`;
-            processImportSuccess(html);
-          })
-          .catch((error: any) => {
-            console.error("Error converting docx to html", error);
-            setError(`Failed to convert ${file.name}. The file might be corrupted.`);
-          })
-          .finally(() => {
-            setIsImporting(false);
-          });
-      };
-      reader.readAsArrayBuffer(file);
-    } else if (fileName.endsWith('.doc')) {
-        alert("Sorry, .doc files are not supported. Please save the file as a .docx and try again.");
-        setIsImporting(false);
-    } else {
-      alert("Sorry, only .md, .txt, and .docx files can be imported at this time.");
-      setIsImporting(false);
-    }
-  };
-
-  const handleContentChange = useCallback((newContent: string) => {
-    updateDocument(newContent, true);
-  }, [updateDocument]);
-
-  const handleRefineDocument = useCallback(async () => {
-    if (!documentContent.trim() || isLoading) return;
-    
-    setIsLoading(true);
-    setError(null);
-    setHasUnrefinedEdits(false);
-
-    try {
-      const updatedDocument = await refineDocumentSection(documentContent);
-      updateDocument(DOMPurify.sanitize(updatedDocument), false);
-
-      const botMessage: ChatMessage = {
-        id: `bot-refine-${Date.now()}`,
-        sender: MessageSender.BOT,
-        text: "I've refined your recent edits. The changes are highlighted.",
-      };
-      setChatHistory(prev => [...prev, botMessage]);
-
-    } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
-      setError(`Sorry, I couldn't process that. ${errorMessage}`);
-      const botErrorMessage: ChatMessage = {
-        id: `bot-error-${Date.now()}`,
-        sender: MessageSender.BOT,
-        text: `An error occurred: ${errorMessage}`,
-      };
-      setChatHistory(prev => [...prev, botErrorMessage]);
-      setHasUnrefinedEdits(true); // Let user try again
-    } finally {
-      setIsLoading(false);
-    }
-  }, [documentContent, isLoading, updateDocument]);
-
-  const handleDismissRefinement = useCallback(() => {
-    setHasUnrefinedEdits(false);
-  }, []);
-
-  const handleSaveDraft = useCallback(() => {
-    setSaveStatus('saving');
-    setTimeout(() => {
+    const handleSaveDraft = useCallback((isAutoSave = false) => {
+        setSaveStatus('saving');
         localStorage.setItem(LOCAL_STORAGE_KEY, documentContent);
-        logHistoryEvent(HistoryEventType.DRAFT_SAVED, documentContent, 'Manual Save');
-        setSaveStatus('saved');
-    }, 300);
-  }, [documentContent, logHistoryEvent]);
+        addHistoryEntry(HistoryEventType.DRAFT_SAVED, isAutoSave ? 'Auto Save' : 'Manual Save');
+        if (!isAutoSave) {
+            setHasUnrefinedEdits(false);
+        }
+        setTimeout(() => {
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus('idle'), 2000);
+        }, 500);
+    }, [addHistoryEntry, documentContent]);
 
-  const handleExportDOCX = () => {
-    if (!documentContent) return;
-    logHistoryEvent(HistoryEventType.EXPORTED_DOCX, documentContent);
-    const title = getDocumentTitle(documentContent);
-    const contentToExport = documentContent.replace(/<mark[^>]*>|<\/mark>/g, '');
-    const bodyHtml = contentToExport;
+    useEffect(() => {
+        const savedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
+        if (savedHistory) setHistory(JSON.parse(savedHistory));
+        const savedContent = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (savedContent) {
+            setDocumentContent(savedContent);
+            setChatHistory([{ id: 'bot-welcome-back', sender: MessageSender.BOT, text: t('chat.welcomeBack') }]);
+            setView('editor');
+        } else {
+            setChatHistory([{ id: 'bot-initial-welcome', sender: MessageSender.BOT, text: t('chat.initialWelcome') }]);
+        }
+    }, [t]);
+
+    const handleContentChange = useCallback((newContent: string) => {
+        setDocumentContent(newContent);
+        setHasUnrefinedEdits(true);
+    }, []);
+
+    useEffect(() => {
+        if (hasUnrefinedEdits) {
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            saveTimeoutRef.current = window.setTimeout(() => handleSaveDraft(true), 3000);
+        }
+        return () => { if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current); };
+    }, [documentContent, hasUnrefinedEdits, handleSaveDraft]);
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if ((event.ctrlKey || event.metaKey) && event.key === 's') {
+                event.preventDefault();
+                if (view === 'editor') handleSaveDraft(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleSaveDraft, view]);
+
+    const handleSendMessage = useCallback(async (message: string) => {
+        const userMessage: ChatMessage = { id: `user-${Date.now()}`, sender: MessageSender.USER, text: message };
+        setChatHistory(prev => [...prev, userMessage]);
+        setIsLoading(true);
+        setError(null);
+        setLoadingMessage(getLoadingMessageFromPrompt(message));
+        try {
+            const updatedHtml = await generateDocumentUpdate(documentContent, message, language);
+            const sanitizedHtml = DOMPurify.sanitize(updatedHtml);
+            setDocumentContent(sanitizedHtml);
+            const botMessage: ChatMessage = { id: `bot-${Date.now()}`, sender: MessageSender.BOT, text: t('chat.documentUpdated') };
+            setChatHistory(prev => [...prev, botMessage]);
+            setHasUnrefinedEdits(false);
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            setError(t('chat.errorOccurred', { errorMessage }));
+        } finally {
+            setIsLoading(false);
+            setLoadingMessage('');
+        }
+    }, [documentContent, language, t]);
     
-    // The html-docx-js library is very particular. It does not handle CSS in a <style> block.
-    // We pass a clean HTML structure without it to prevent file corruption.
-    const fullHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8">
-        </head>
-        <body>
-          ${bodyHtml}
-        </body>
-      </html>
-    `;
+    const handleRefineDocument = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        setLoadingMessage(t('editor.refine.refining'));
+        try {
+            const updatedHtml = await refineDocumentSection(documentContent, language);
+            const sanitizedHtml = DOMPurify.sanitize(updatedHtml);
+            setDocumentContent(sanitizedHtml);
+            const botMessage: ChatMessage = { id: `bot-refine-${Date.now()}`, sender: MessageSender.BOT, text: t('chat.documentRefined') };
+            setChatHistory(prev => [...prev, botMessage]);
+            setHasUnrefinedEdits(false);
+        } catch (e) {
+            const errorMessage = e instanceof Error ? e.message : String(e);
+            setError(t('chat.errorOccurred', { errorMessage }));
+        } finally {
+            setIsLoading(false);
+            setLoadingMessage('');
+        }
+    }, [documentContent, language, t]);
 
-    try {
-        const docxBlob = htmlDocx.asBlob(fullHtml);
-        saveAs(docxBlob, `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.docx`);
-    } catch (error) {
-        console.error("Error exporting DOCX:", error);
-        setError("Failed to export document as .docx.");
-    }
-  };
-  
-  const handleShowTemplates = useCallback(() => setView('templates'), []);
+    const handleToggleGuidedMode = useCallback(() => {
+        setIsGuidedMode(prev => {
+            const newState = !prev;
+            if (newState) {
+                const botMessage: ChatMessage = { id: `bot-${Date.now()}`, sender: MessageSender.BOT, text: t('chat.guidedMode.activated') };
+                setChatHistory(prevChat => [...prevChat, botMessage]);
+            }
+            return newState;
+        });
+    }, [t]);
 
-  if (view === 'templates') {
-    return <TemplateLibrary onSelectTemplate={handleSelectTemplate} onStartBlank={handleStartBlank} onFileImport={handleFileImport} isImporting={isImporting} />;
-  }
+    useEffect(() => {
+        if (isGuidedMode && chatHistory.length > 0 && chatHistory[chatHistory.length - 1].sender === MessageSender.USER) {
+            const fetchGuidingQuestion = async () => {
+                try {
+                    const questions = await generateGuidingQuestions(documentContent, chatHistory, language);
+                    if (questions.length > 0) {
+                        const botMessage: ChatMessage = { id: `bot-guide-${Date.now()}`, sender: MessageSender.BOT, text: questions[0] };
+                        setChatHistory(prev => [...prev, botMessage]);
+                    }
+                } catch (e) {
+                    const botMessage: ChatMessage = { id: `bot-guide-error-${Date.now()}`, sender: MessageSender.BOT, text: t('chat.guidedMode.error') };
+                    setChatHistory(prev => [...prev, botMessage]);
+                }
+            };
+            fetchGuidingQuestion();
+        }
+    }, [isGuidedMode, chatHistory, documentContent, language, t]);
 
-  return (
-    <div className="flex flex-col h-screen font-sans bg-[#0D0D0D] text-[#F5F5F5]">
-      <Header 
-        onShowTemplates={handleShowTemplates} 
-        onExportDOCX={handleExportDOCX}
-        saveStatus={saveStatus}
-        onShowHistory={() => setIsHistoryOpen(true)}
-        onSaveDraft={handleSaveDraft}
-      />
-      <main className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-4 p-4 overflow-hidden">
-        <div className="flex flex-col h-full bg-[#1A1A1A] rounded-lg border border-[#262626] overflow-hidden min-w-0">
-          <ChatInterface
-            messages={chatHistory}
-            onSendMessage={handleSendMessage}
-            isLoading={isLoading}
-            error={error}
-          />
+    const handleSelectTemplate = useCallback((template: Template) => {
+        const placeholderContent = highlightPlaceholders(template.content, t('editor.placeholderTooltip'));
+        setDocumentContent(placeholderContent);
+        setChatHistory([{ id: 'bot-template-loaded', sender: MessageSender.BOT, text: t('chat.templateLoaded', { templateName: t(template.name) }) }]);
+        addHistoryEntry(HistoryEventType.TEMPLATE_LOADED, template.key);
+        setView('editor');
+    }, [t, addHistoryEntry]);
+
+    const handleStartBlank = useCallback(() => {
+        setDocumentContent(`<h1>${t('editor.newDocumentTitle')}</h1><p>${t('editor.startWriting')}</p>`);
+        setChatHistory([{ id: 'bot-start-blank', sender: MessageSender.BOT, text: t('chat.startedBlank') }]);
+        addHistoryEntry(HistoryEventType.STARTED_BLANK);
+        setView('editor');
+    }, [t, addHistoryEntry]);
+    
+    const handleFileImport = useCallback(async (file: File) => {
+        setIsImporting(true);
+        setError(null);
+        try {
+            let htmlContent: string;
+            if (file.name.endsWith('.docx')) {
+                const arrayBuffer = await file.arrayBuffer();
+                const result = await mammoth.convertToHtml({ arrayBuffer });
+                htmlContent = result.value;
+            } else if (file.name.endsWith('.doc')) {
+                setError(t('errors.docNotSupported'));
+                setIsImporting(false);
+                return;
+            } else if (file.name.endsWith('.md') || file.name.endsWith('.txt')) {
+                htmlContent = await file.text();
+            } else {
+                 setError(t('errors.unsupportedFileType'));
+                 setIsImporting(false);
+                 return;
+            }
+            setDocumentContent(DOMPurify.sanitize(htmlContent));
+            setChatHistory([{ id: 'bot-imported', sender: MessageSender.BOT, text: t('chat.importedFile', { fileName: file.name }) }]);
+            addHistoryEntry(HistoryEventType.IMPORTED, file.name);
+            setView('editor');
+        } catch (e) {
+             setError(t('errors.fileReadFailed'));
+        } finally {
+            setIsImporting(false);
+        }
+    }, [t, addHistoryEntry]);
+
+    const handleExportDOCX = useCallback(() => {
+        const title = getDocumentTitle(documentContent);
+        const fileName = `${title}.docx`;
+        try {
+            const content = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>${documentContent}</body></html>`;
+            const converted = htmlDocx.asBlob(content);
+            saveAs(converted, fileName);
+            addHistoryEntry(HistoryEventType.EXPORTED_DOCX, title);
+        } catch (e) {
+            setError(t('errors.exportFailed'));
+        }
+    }, [documentContent, t, addHistoryEntry]);
+
+    const handleRestoreFromHistory = useCallback((entry: HistoryEntry) => {
+        if (entry.documentContent) {
+            setDocumentContent(entry.documentContent);
+            setChatHistory(prev => [...prev, { id: `bot-restored-${Date.now()}`, sender: MessageSender.BOT, text: t('chat.restoredVersion', { documentTitle: entry.documentTitle, date: new Date(entry.timestamp).toLocaleString(language) }) }]);
+            addHistoryEntry(HistoryEventType.RESTORED, entry.documentTitle);
+            setIsHistoryOpen(false);
+        } else {
+            setError(t('errors.restoreNoContent'));
+        }
+    }, [t, language, addHistoryEntry]);
+
+    const handleNavigateToTemplates = useCallback(() => {
+        if (hasUnrefinedEdits) {
+            setConfirmation({
+                title: t('confirmation.title'),
+                message: t('confirmation.message'),
+                confirmText: t('confirmation.confirmLeave'),
+                onConfirm: () => {
+                    setView('templates');
+                    setConfirmation(null);
+                },
+                onCancel: () => setConfirmation(null),
+            });
+        } else {
+            setView('templates');
+        }
+    }, [hasUnrefinedEdits, t]);
+
+    const handleClearChat = useCallback(() => {
+        setChatHistory(prev => prev.slice(0, 1));
+    }, []);
+
+    return (
+        <div className="flex flex-col h-screen font-sans bg-[#0D0D0D] text-[#F5F5F5]">
+            {view === 'templates' ? (
+                <TemplateLibrary 
+                    onSelectTemplate={handleSelectTemplate} 
+                    onStartBlank={handleStartBlank}
+                    onFileImport={handleFileImport}
+                    isImporting={isImporting}
+                />
+            ) : (
+                <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading Editor...</div>}>
+                    <EditorView
+                        documentContent={documentContent}
+                        documentTitle={getDocumentTitle(documentContent)}
+                        chatHistory={chatHistory}
+                        saveStatus={saveStatus}
+                        isLoading={isLoading}
+                        hasUnrefinedEdits={!isLoading && hasUnrefinedEdits}
+                        error={error}
+                        loadingMessage={loadingMessage}
+                        isHistoryOpen={isHistoryOpen}
+                        history={history}
+                        isGuidedMode={isGuidedMode}
+                        onContentChange={handleContentChange}
+                        onSendMessage={handleSendMessage}
+                        onRefineDocument={handleRefineDocument}
+                        onDismissRefinement={() => setHasUnrefinedEdits(false)}
+                        onShowTemplates={handleNavigateToTemplates}
+                        onExportDOCX={handleExportDOCX}
+                        onShowHistory={() => setIsHistoryOpen(true)}
+                        onSaveDraft={() => handleSaveDraft(false)}
+                        onCloseHistory={() => setIsHistoryOpen(false)}
+                        onRestoreFromHistory={handleRestoreFromHistory}
+                        onToggleGuidedMode={handleToggleGuidedMode}
+                        onClearChat={handleClearChat}
+                    />
+                </Suspense>
+            )}
+            <ConfirmationModal 
+                isOpen={!!confirmation}
+                title={confirmation?.title ?? ''}
+                message={confirmation?.message ?? ''}
+                confirmText={confirmation?.confirmText}
+                onConfirm={() => confirmation?.onConfirm()}
+                onCancel={() => confirmation?.onCancel()}
+            />
         </div>
-        <div className="flex flex-col h-full bg-[#1A1A1A] rounded-lg border border-[#262626] overflow-hidden min-w-0">
-          <DocumentEditor
-            content={documentContent}
-            onContentChange={handleContentChange}
-            hasUnrefinedEdits={hasUnrefinedEdits}
-            isRefining={isLoading}
-            onRefineDocument={handleRefineDocument}
-            onDismissRefinement={handleDismissRefinement}
-          />
-        </div>
-      </main>
-      <Suspense fallback={<div>Loading...</div>}>
-        <HistoryLogModal
-          isOpen={isHistoryOpen}
-          onClose={() => setIsHistoryOpen(false)}
-          history={history}
-        />
-      </Suspense>
-    </div>
-  );
+    );
 };
 
 export default App;

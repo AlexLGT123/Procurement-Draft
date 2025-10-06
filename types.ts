@@ -23,6 +23,7 @@ export enum HistoryEventType {
   IMPORTED = 'imported',
   EXPORTED_DOCX = 'exported_docx',
   STARTED_BLANK = 'started_blank',
+  RESTORED = 'restored',
 }
 
 export interface HistoryEntry {
@@ -30,5 +31,6 @@ export interface HistoryEntry {
   type: HistoryEventType;
   timestamp: number;
   documentTitle: string;
+  documentContent: string;
   details?: string; // e.g., template name, file name
 }
