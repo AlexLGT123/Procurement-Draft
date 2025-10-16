@@ -1,12 +1,15 @@
+
 import React, { useRef, useState, lazy, Suspense } from 'react';
-import { RocketIcon, QuestionMarkCircleIcon, DocumentIcon, FilePlusIcon, UploadIcon } from './Icon';
+import { RocketIcon, QuestionMarkCircleIcon, DocumentIcon, FilePlusIcon, UploadIcon, BookIcon } from './Icon';
 import { TEMPLATES } from './templates';
 import type { Template } from '../types';
 import { LoadingSpinner } from './LoadingSpinner';
 import { useTranslation } from '../hooks/useTranslation';
 
-// Lazy load the modal component
+// Lazy load the modal components
 const FaqModal = lazy(() => import('./FaqModal').then(module => ({ default: module.FaqModal })));
+const DocumentationModal = lazy(() => import('./DocumentationModal').then(module => ({ default: module.DocumentationModal })));
+
 
 // Component for language selection
 const LanguageSwitcher: React.FC = () => {
@@ -55,6 +58,7 @@ export const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onSelectTempla
     const { t } = useTranslation();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isFaqOpen, setIsFaqOpen] = useState(false);
+    const [isDocOpen, setIsDocOpen] = useState(false);
 
     const handleImportClick = () => {
         fileInputRef.current?.click();
@@ -71,6 +75,18 @@ export const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onSelectTempla
         <div className="relative flex flex-col items-center justify-center min-h-screen bg-[#0D0D0D] p-8">
             <div className="absolute top-8 right-8 z-10 flex items-center gap-4">
                 <LanguageSwitcher />
+                <div className="relative group">
+                    <button
+                        onClick={() => setIsDocOpen(true)}
+                        className="text-[#A3A3A3] hover:text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0D0D0D] focus:ring-[#7F56D9] p-1.5 rounded-full hover:bg-[#262626]"
+                        aria-label={t('templates.documentationLink')}
+                    >
+                        <BookIcon className="w-6 h-6" />
+                    </button>
+                    <div className="absolute bottom-full right-1/2 translate-x-1/2 mb-2 w-max px-3 py-1.5 bg-[#131313] border border-[#262626] text-white text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none whitespace-nowrap">
+                        {t('templates.documentationLink')}
+                    </div>
+                </div>
                 <div className="relative group">
                     <button
                         onClick={() => setIsFaqOpen(true)}
@@ -116,12 +132,12 @@ export const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onSelectTempla
                     <ActionCard onClick={onStartBlank}>
                         <FilePlusIcon className="h-8 w-8 text-[#A3A3A3] group-hover:text-white transition-colors mb-4" />
                         <h3 className="font-bold text-lg text-[#F5F5F5] group-hover:text-white">{t('templates.startBlank')}</h3>
-                        <p className="text-sm text-[#A3A3A3]">Begin with a clean slate.</p>
+                        <p className="text-sm text-[#A3A3A3]">{t('templates.startBlankDescription')}</p>
                     </ActionCard>
                      <ActionCard onClick={handleImportClick} disabled={isImporting}>
                         {isImporting ? <LoadingSpinner /> : <UploadIcon className="h-8 w-8 text-[#A3A3A3] group-hover:text-white transition-colors mb-4" />}
                         <h3 className="font-bold text-lg text-[#F5F5F5] group-hover:text-white">{isImporting ? t('templates.importing') : t('templates.importFromFile')}</h3>
-                        <p className="text-sm text-[#A3A3A3]">Supports .docx, .md, .txt</p>
+                        <p className="text-sm text-[#A3A3A3]">{t('templates.importFromFileDescription')}</p>
                     </ActionCard>
                 </div>
                  <input
@@ -133,8 +149,9 @@ export const TemplateLibrary: React.FC<TemplateLibraryProps> = ({ onSelectTempla
                 />
             </main>
             
-            <Suspense fallback={<div>Loading...</div>}>
+            <Suspense fallback={<div>{t('common.loading')}</div>}>
                 <FaqModal isOpen={isFaqOpen} onClose={() => setIsFaqOpen(false)} />
+                <DocumentationModal isOpen={isDocOpen} onClose={() => setIsDocOpen(false)} />
             </Suspense>
         </div>
     );

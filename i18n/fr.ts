@@ -4,6 +4,8 @@ export const fr = {
     or: 'ou',
     thinking: 'Réflexion...',
     runningFor: 'En cours... {{seconds}}s',
+    loading: 'Chargement...',
+    loadingEditor: "Chargement de l'éditeur...",
   },
   header: {
     title: 'ProcurementDraft',
@@ -14,6 +16,7 @@ export const fr = {
     saving: 'Sauvegarde...',
     saved: 'Modifications sauvegardées',
     landingPageAria: "Aller à la page d'accueil",
+    documentation: 'Mode d\'emploi',
   },
   chat: {
     title: 'Chat',
@@ -57,8 +60,11 @@ export const fr = {
     chooseStartPoint: 'Choisissez un point de départ',
     importing: 'Importation...',
     importFromFile: 'Importer un fichier',
+    importFromFileDescription: 'Fichiers supportés : .docx, .md, .txt',
     startBlank: 'Commencer avec un document vierge',
+    startBlankDescription: 'Commencez sur une page blanche.',
     faqLink: 'FAQ & Confidentialité',
+    documentationLink: 'Mode d\'emploi',
     rfp: {
       name: 'Appel d\'offres (RFP)',
       description: 'Un modèle complet pour solliciter des propositions détaillées pour un projet, décrivant la portée, les exigences et les critères d\'évaluation.',
@@ -174,5 +180,58 @@ export const fr = {
     confirm: 'Confirmer',
     cancel: 'Annuler',
     confirmLeave: 'Quitter la page',
+  },
+  documentation: {
+    modalTitle: 'Comment utiliser ProcurementDraft IA',
+    closeAria: 'Fermer la documentation',
+    sections: [
+      {
+        title: '1. Démarrer votre document',
+        content: [
+          '<strong>À partir d\'un modèle :</strong> Choisissez l\'un des modèles professionnels comme RFP ou NDA. Cela vous donne un document structuré pour commencer, avec des espaces réservés à remplir.',
+          '<strong>Partir de zéro :</strong> Si vous préférez commencer de zéro, sélectionnez "Commencer avec un document vierge". Vous pourrez ensuite utiliser le chat pour construire le document section par section.',
+          '<strong>Importer un fichier :</strong> Vous pouvez importer un document existant (.docx, .md, .txt). L\'application le convertira en format éditable, et vous pourrez alors utiliser l\'IA pour l\'améliorer.',
+        ],
+      },
+      {
+        title: '2. Utiliser l\'assistant de chat',
+        content: [
+          'Le chat est votre principal outil pour interagir avec l\'IA. Tapez simplement vos instructions en langage clair.',
+          '<strong>Exemples :</strong><ul><li>"Ajoute une section sur la politique de développement durable de notre entreprise."</li><li>"Crée un tableau avec les colonnes Article, Quantité et Prix."</li><li>"Reformule l\'introduction pour qu\'elle soit plus formelle."</li></ul>',
+          'L\'IA mettra à jour le document à droite. Toutes les modifications seront surlignées en <mark>violet</mark> pour votre examen.',
+        ],
+      },
+      {
+        title: '3. Édition directe et mise en forme',
+        content: [
+          'Vous pouvez cliquer directement dans l\'éditeur de document à droite pour effectuer des modifications manuelles à tout moment.',
+          'Utilisez la barre d\'outils en haut de l\'éditeur pour appliquer une mise en forme comme le <strong>gras</strong>, l\'<em>italique</em>, les listes et les titres.',
+        ],
+      },
+      {
+        title: '4. Affiner vos modifications',
+        content: [
+          'Après avoir effectué des modifications manuelles, une bannière violette apparaîtra en bas de l\'éditeur.',
+          'Cliquez sur le bouton "Affiner avec l\'IA". L\'IA examinera vos changements, les améliorant en termes de clarté, de professionnalisme et de ton, tout en préservant votre intention initiale. Les améliorations seront également surlignées.',
+          'Si vous êtes satisfait de vos modifications manuelles, vous pouvez ignorer cette suggestion en cliquant sur le "X" de la bannière ou en sauvegardant le brouillon.',
+        ],
+      },
+      {
+        title: '5. Mode Guidé',
+        content: [
+          'Activez le "Mode Guidé" dans le panneau de chat pour obtenir une aide proactive de l\'IA.',
+          'Dans ce mode, après avoir envoyé un message, l\'IA analysera le document et vous posera une question pertinente et ouverte pour vous aider à déterminer sur quoi travailler ensuite. C\'est excellent pour surmonter le blocage de l\'écrivain ou pour s\'assurer que vous n\'avez oublié aucune section importante.',
+        ],
+      },
+      {
+        title: '6. Sauvegarde, historique et exportation',
+        content: [
+          '<strong>Sauvegarde automatique :</strong> L\'application sauvegarde automatiquement votre travail quelques secondes après que vous ayez cessé de taper.',
+          '<strong>Sauvegarde manuelle :</strong> Vous pouvez cliquer sur "Sauvegarder" ou utiliser Ctrl/Cmd + S pour enregistrer votre progression à tout moment.',
+          '<strong>Historique :</strong> Cliquez sur le bouton "Historique" pour voir un journal de toutes vos actions (sauvegardes, chargements de modèles, etc.). Vous pouvez restaurer le document à n\'importe quel état antérieur à partir de ce journal.',
+          '<strong>Exporter :</strong> Lorsque vous avez terminé, cliquez sur "Exporter DOCX" pour télécharger votre document sous forme de fichier Microsoft Word.',
+        ],
+      },
+    ],
   },
 };

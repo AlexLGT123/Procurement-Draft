@@ -1,5 +1,5 @@
 
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { Header } from './Header';
 import { ChatInterface } from './ChatInterface';
 import { DocumentEditor } from './DocumentEditor';
@@ -7,6 +7,8 @@ import type { ChatMessage, HistoryEntry } from '../types';
 import { useResizablePanels } from '../hooks/useResizablePanels';
 
 const HistoryLogModal = lazy(() => import('./HistoryLogModal').then(module => ({ default: module.HistoryLogModal })));
+const DocumentationModal = lazy(() => import('./DocumentationModal').then(module => ({ default: module.DocumentationModal })));
+
 
 interface EditorViewProps {
     documentContent: string;
@@ -60,6 +62,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
     onClearChat
 }) => {
     const { panelSize, handleMouseDown } = useResizablePanels(50);
+    const [isDocOpen, setIsDocOpen] = useState(false);
 
     return (
         <div className="flex flex-col h-screen font-sans bg-[#0D0D0D] text-[#F5F5F5]">
@@ -70,6 +73,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                 saveStatus={saveStatus}
                 onShowHistory={onShowHistory}
                 onSaveDraft={onSaveDraft}
+                onShowDocumentation={() => setIsDocOpen(true)}
             />
             <main className="flex-grow flex p-4 overflow-hidden gap-4">
                 <div 
@@ -114,6 +118,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
                     history={history}
                     onRestore={onRestoreFromHistory}
                 />
+                <DocumentationModal isOpen={isDocOpen} onClose={() => setIsDocOpen(false)} />
             </Suspense>
         </div>
     );

@@ -1,4 +1,5 @@
-import { useState, useCallback, useEffect } from 'react';
+// Fix: Import React to use React types like React.MouseEvent.
+import React, { useState, useCallback, useEffect } from 'react';
 import { RESIZABLE_PANEL_STORAGE_KEY } from '../constants';
 
 export const useResizablePanels = (initialSize: number = 50) => {

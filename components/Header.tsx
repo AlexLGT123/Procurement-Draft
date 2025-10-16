@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { RocketIcon, FileExportIcon, CheckIcon, HistoryIcon, SaveIcon } from './Icon';
+import { RocketIcon, FileExportIcon, CheckIcon, HistoryIcon, SaveIcon, BookIcon } from './Icon';
 import { LoadingSpinner } from './LoadingSpinner';
 import { useTranslation } from '../hooks/useTranslation';
 
@@ -12,6 +12,7 @@ interface HeaderProps {
     saveStatus: SaveStatus;
     onShowHistory: () => void;
     onSaveDraft: () => void;
+    onShowDocumentation: () => void;
 }
 
 const SaveStatusIndicator: React.FC<{ status: SaveStatus }> = ({ status }) => {
@@ -35,7 +36,7 @@ const SaveStatusIndicator: React.FC<{ status: SaveStatus }> = ({ status }) => {
     );
 };
 
-const HeaderComponent: React.FC<HeaderProps> = ({ documentTitle, onShowTemplates, onExportDOCX, saveStatus, onShowHistory, onSaveDraft }) => {
+const HeaderComponent: React.FC<HeaderProps> = ({ documentTitle, onShowTemplates, onExportDOCX, saveStatus, onShowHistory, onSaveDraft, onShowDocumentation }) => {
   const { t } = useTranslation();
   return (
     <header className="flex-shrink-0 bg-[#131313]/80 backdrop-blur-sm border-b border-[#262626] p-4">
@@ -84,6 +85,13 @@ const HeaderComponent: React.FC<HeaderProps> = ({ documentTitle, onShowTemplates
                 >
                 <HistoryIcon className="h-4 w-4" />
                 <span>{t('header.history')}</span>
+            </button>
+            <button
+                onClick={onShowDocumentation}
+                className="bg-[#262626] hover:bg-[#333333] text-[#F5F5F5] text-sm font-semibold py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#131313] focus:ring-[#7F56D9] flex items-center gap-2"
+            >
+                <BookIcon className="h-4 w-4" />
+                <span>{t('header.documentation')}</span>
             </button>
             <button
                 onClick={onExportDOCX}

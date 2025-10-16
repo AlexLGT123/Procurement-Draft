@@ -77,6 +77,7 @@ const App: React.FC = () => {
     const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
 
     const saveTimeoutRef = useRef<number | null>(null);
+    const isInitialMount = useRef(true);
 
     const addHistoryEntry = useCallback((type: HistoryEventType, details?: string) => {
         setHistory(prev => {
@@ -105,15 +106,34 @@ const App: React.FC = () => {
     }, [addHistoryEntry, documentContent]);
 
     useEffect(() => {
-        const savedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
-        if (savedHistory) setHistory(JSON.parse(savedHistory));
-        const savedContent = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (savedContent) {
-            setDocumentContent(savedContent);
-            setChatHistory([{ id: 'bot-welcome-back', sender: MessageSender.BOT, text: t('chat.welcomeBack') }]);
-            setView('editor');
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+
+            const savedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
+            if (savedHistory) setHistory(JSON.parse(savedHistory));
+            
+            const savedContent = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (savedContent) {
+                setDocumentContent(savedContent);
+                setChatHistory([{ id: 'bot-welcome-back', sender: MessageSender.BOT, text: t('chat.welcomeBack') }]);
+                setView('editor');
+            } else {
+                setChatHistory([{ id: 'bot-initial-welcome', sender: MessageSender.BOT, text: t('chat.initialWelcome') }]);
+            }
         } else {
-            setChatHistory([{ id: 'bot-initial-welcome', sender: MessageSender.BOT, text: t('chat.initialWelcome') }]);
+            // On language change, update welcome messages if they exist to avoid overwriting chat history
+            setChatHistory(prev => {
+                if (prev.length > 0) {
+                    const firstMessage = prev[0];
+                    if (firstMessage.id === 'bot-welcome-back') {
+                        return [{...firstMessage, text: t('chat.welcomeBack')}, ...prev.slice(1)];
+                    }
+                    if (firstMessage.id === 'bot-initial-welcome') {
+                        return [{...firstMessage, text: t('chat.initialWelcome')}, ...prev.slice(1)];
+                    }
+                }
+                return prev;
+            });
         }
     }, [t]);
 
@@ -313,7 +333,7 @@ const App: React.FC = () => {
                     isImporting={isImporting}
                 />
             ) : (
-                <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading Editor...</div>}>
+                <Suspense fallback={<div className="flex items-center justify-center h-screen">{t('common.loadingEditor')}</div>}>
                     <EditorView
                         documentContent={documentContent}
                         documentTitle={getDocumentTitle(documentContent)}

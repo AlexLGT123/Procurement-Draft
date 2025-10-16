@@ -4,6 +4,8 @@ export const en = {
     or: 'or',
     thinking: 'Thinking...',
     runningFor: 'Running for {{seconds}}s',
+    loading: 'Loading...',
+    loadingEditor: 'Loading Editor...',
   },
   header: {
     title: 'ProcurementDraft',
@@ -14,6 +16,7 @@ export const en = {
     saving: 'Saving...',
     saved: 'All changes saved',
     landingPageAria: 'Go to landing page',
+    documentation: 'How-to Guide',
   },
   chat: {
     title: 'Chat',
@@ -57,8 +60,11 @@ export const en = {
     chooseStartPoint: 'Choose a Starting Point',
     importing: 'Importing...',
     importFromFile: 'Import from File',
+    importFromFileDescription: 'Supports .docx, .md, .txt',
     startBlank: 'Start with a Blank Document',
+    startBlankDescription: 'Begin with a clean slate.',
     faqLink: 'FAQ & Data Privacy',
+    documentationLink: 'How-to Guide',
     rfp: {
       name: 'Request for Proposal',
       description: 'A comprehensive template to solicit detailed proposals for a specific project, outlining scope, requirements, and evaluation criteria.',
@@ -174,5 +180,58 @@ export const en = {
     confirm: 'Confirm',
     cancel: 'Cancel',
     confirmLeave: 'Leave Page',
+  },
+  documentation: {
+    modalTitle: 'How to Use ProcurementDraft IA',
+    closeAria: 'Close documentation',
+    sections: [
+      {
+        title: '1. Starting Your Document',
+        content: [
+          '<strong>From a Template:</strong> Choose one of the professionally crafted templates like RFP or NDA. This gives you a structured document to start with, complete with placeholders for you to fill in.',
+          '<strong>Start Blank:</strong> If you prefer to begin from scratch, select "Start with a Blank Document". You can then use the chat to build the document section by section.',
+          '<strong>Import a File:</strong> You can import an existing document (.docx, .md, .txt). The app will convert it to an editable format, and you can then use the AI to enhance it.',
+        ],
+      },
+      {
+        title: '2. Using the Chat Assistant',
+        content: [
+          'The chat is your primary tool for interacting with the AI. Simply type your instructions in plain language.',
+          '<strong>Examples:</strong><ul><li>"Add a section about our company\'s sustainability policy."</li><li>"Create a table with columns for Item, Quantity, and Price."</li><li>"Rephrase the introduction to sound more formal."</li></ul>',
+          'The AI will update the document on the right. All changes will be highlighted in <mark>purple</mark> for your review.',
+        ],
+      },
+      {
+        title: '3. Direct Editing & Formatting',
+        content: [
+          'You can click directly into the document editor on the right to make manual changes at any time.',
+          'Use the toolbar at the top of the editor to apply formatting like <strong>bold</strong>, <em>italics</em>, lists, and headings.',
+        ],
+      },
+      {
+        title: '4. Refining Your Edits',
+        content: [
+          'After you make manual edits, a purple banner will appear at the bottom of the editor.',
+          'Click the "Refine with AI" button. The AI will review your changes, improving them for clarity, professionalism, and tone, while preserving your original intent. The refinements will also be highlighted.',
+          'If you are happy with your manual changes, you can dismiss this suggestion by clicking the "X" button on the banner or by saving the draft.',
+        ],
+      },
+      {
+        title: '5. Guided Mode',
+        content: [
+          'Toggle "Guided Mode" in the chat panel to get proactive help from the AI.',
+          'In this mode, after you send a message, the AI will analyze the document and ask you a relevant, open-ended question to help you figure out what to work on next. This is great for overcoming writer\'s block or ensuring you haven\'t missed any important sections.',
+        ],
+      },
+      {
+        title: '6. Saving, History & Exporting',
+        content: [
+          '<strong>Auto-Save:</strong> The app automatically saves your work a few seconds after you stop typing.',
+          '<strong>Manual Save:</strong> You can click "Save Draft" or use Ctrl/Cmd + S to save your progress at any time.',
+          '<strong>History:</strong> Click the "History" button to see a log of all your actions (saves, template loads, etc.). You can restore the document to any previous state from this log.',
+          '<strong>Export:</strong> When you are finished, click "Export DOCX" to download your document as a Microsoft Word file.',
+        ],
+      },
+    ],
   },
 };
