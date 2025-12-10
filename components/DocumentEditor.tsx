@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, memo, useState, useCallback } from 'react';
 import { SparkleIcon, CloseIcon, SpinnerIcon } from './Icon';
 import { useTimer } from '../hooks/useTimer';
@@ -26,6 +27,7 @@ const DocumentEditorComponent: React.FC<DocumentEditorProps> = ({
   const { t } = useTranslation();
   const editorRef = useRef<HTMLDivElement>(null);
   const elapsedTime = useTimer(isRefining);
+  const rAFRef = useRef<number | null>(null);
 
   const [activeFormats, setActiveFormats] = useState<ActiveFormats>({
       bold: false,
@@ -47,36 +49,47 @@ const DocumentEditorComponent: React.FC<DocumentEditorProps> = ({
   }, [content]);
 
   const updateFormatState = useCallback(() => {
-      const selection = window.getSelection();
-      if (!selection || selection.rangeCount === 0) return;
+      // Cancel any pending frame to avoid stacking
+      if (rAFRef.current) {
+          cancelAnimationFrame(rAFRef.current);
+      }
 
-      const getParentTag = (node: Node | null): string => {
-          let currentNode = node;
-          while (currentNode) {
-              if (currentNode.nodeName.match(/^(P|H1|H2|H3|BLOCKQUOTE|LI)$/)) {
-                  // For LI, check its parent (UL or OL)
-                  if (currentNode.nodeName === 'LI') {
-                      return currentNode.parentElement?.nodeName.toLowerCase() || 'li';
+      // Schedule the DOM query for the next animation frame
+      rAFRef.current = requestAnimationFrame(() => {
+          const selection = window.getSelection();
+          if (!selection || selection.rangeCount === 0) return;
+
+          const getParentTag = (node: Node | null): string => {
+              let currentNode = node;
+              while (currentNode) {
+                  if (currentNode.nodeName.match(/^(P|H1|H2|H3|BLOCKQUOTE|LI)$/)) {
+                      // For LI, check its parent (UL or OL)
+                      if (currentNode.nodeName === 'LI') {
+                          return currentNode.parentElement?.nodeName.toLowerCase() || 'li';
+                      }
+                      return currentNode.nodeName.toLowerCase();
                   }
-                  return currentNode.nodeName.toLowerCase();
+                  if (currentNode === editorRef.current) break;
+                  currentNode = currentNode.parentElement;
               }
-              if (currentNode === editorRef.current) break;
-              currentNode = currentNode.parentElement;
-          }
-          return 'p';
-      };
+              return 'p';
+          };
 
-      const blockType = getParentTag(selection.getRangeAt(0).startContainer);
-      
-      setActiveFormats({
-          bold: document.queryCommandState('bold'),
-          italic: document.queryCommandState('italic'),
-          underline: document.queryCommandState('underline'),
-          strikethrough: document.queryCommandState('strikethrough'),
-          ul: document.queryCommandState('insertUnorderedList'),
-          ol: document.queryCommandState('insertOrderedList'),
-          blockquote: blockType === 'blockquote',
-          blockType: blockType.replace(/li|ul|ol/, 'p'), // Reset to paragraph for list items in dropdown
+          // Safe check in case selection disappeared during frame wait
+          if (selection.rangeCount > 0) {
+              const blockType = getParentTag(selection.getRangeAt(0).startContainer);
+              
+              setActiveFormats({
+                  bold: document.queryCommandState('bold'),
+                  italic: document.queryCommandState('italic'),
+                  underline: document.queryCommandState('underline'),
+                  strikethrough: document.queryCommandState('strikethrough'),
+                  ul: document.queryCommandState('insertUnorderedList'),
+                  ol: document.queryCommandState('insertOrderedList'),
+                  blockquote: blockType === 'blockquote',
+                  blockType: blockType.replace(/li|ul|ol/, 'p'), 
+              });
+          }
       });
   }, []);
 
@@ -101,6 +114,7 @@ const DocumentEditorComponent: React.FC<DocumentEditorProps> = ({
         editor.removeEventListener('keyup', updateFormatState);
         editor.removeEventListener('mouseup', updateFormatState);
         editor.removeEventListener('focus', updateFormatState);
+        if (rAFRef.current) cancelAnimationFrame(rAFRef.current);
     };
   }, [updateFormatState]);
 

@@ -5,8 +5,12 @@ import type { ChatMessage, Template, HistoryEntry } from './types';
 import { MessageSender, HistoryEventType } from './types';
 import { generateDocumentUpdate, refineDocumentSection, generateGuidingQuestions } from './services/geminiService';
 import { useTranslation } from './hooks/useTranslation';
-import { LOCAL_STORAGE_KEY, HISTORY_STORAGE_KEY } from './constants';
+import { HISTORY_STORAGE_KEY } from './constants';
 import { ConfirmationModal } from './components/ConfirmationModal';
+import { useAuth } from './context/AuthContext';
+import { LoginView } from './components/LoginView';
+import { db } from './services/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const EditorView = lazy(() => import('./components/EditorView'));
 
@@ -62,6 +66,8 @@ const highlightPlaceholders = (html: string, tooltipText: string): string => {
 
 const App: React.FC = () => {
     const { t, language } = useTranslation();
+    const { user, loading: authLoading } = useAuth();
+    
     const [view, setView] = useState<AppView>('templates');
     const [documentContent, setDocumentContent] = useState<string>('');
     const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -75,9 +81,57 @@ const App: React.FC = () => {
     const [isImporting, setIsImporting] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('');
     const [confirmation, setConfirmation] = useState<ConfirmationState | null>(null);
+    const [dataLoaded, setDataLoaded] = useState(false);
 
     const saveTimeoutRef = useRef<number | null>(null);
-    const isInitialMount = useRef(true);
+
+    // Initial Data Load from Firestore
+    useEffect(() => {
+        const loadUserData = async () => {
+            if (!user?.uid) return;
+            
+            try {
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDoc = await getDoc(userDocRef);
+
+                if (userDoc.exists()) {
+                    const data = userDoc.data();
+                    if (data.documentContent) {
+                        setDocumentContent(data.documentContent);
+                        setView('editor');
+                    }
+                    if (data.chatHistory && Array.isArray(data.chatHistory)) setChatHistory(data.chatHistory);
+                    if (data.history && Array.isArray(data.history)) setHistory(data.history);
+                    
+                    if (data.documentContent) {
+                        setChatHistory(prev => {
+                            // Check if welcome back message already exists
+                            if (prev.length > 0 && prev[0].id === 'bot-welcome-back') return prev;
+                            return [{ id: 'bot-welcome-back', sender: MessageSender.BOT, text: t('chat.welcomeBack') }, ...prev];
+                        });
+                    } else {
+                        // Only add initial welcome if we truly have no data and no history
+                        setChatHistory(prev => {
+                             if (prev.length > 0) return prev;
+                             return [{ id: 'bot-initial-welcome', sender: MessageSender.BOT, text: t('chat.initialWelcome') }];
+                        });
+                    }
+                } else {
+                     setChatHistory([{ id: 'bot-initial-welcome', sender: MessageSender.BOT, text: t('chat.initialWelcome') }]);
+                }
+            } catch (err) {
+                console.error("Failed to load user data:", err);
+                setError(t('errors.loadFailed'));
+            } finally {
+                setDataLoaded(true);
+            }
+        };
+
+        if (user?.uid && !dataLoaded) {
+            loadUserData();
+        }
+    }, [user?.uid, dataLoaded, t]);
+
 
     const addHistoryEntry = useCallback((type: HistoryEventType, details?: string) => {
         setHistory(prev => {
@@ -87,55 +141,57 @@ const App: React.FC = () => {
                 if (lastEntry && lastEntry.type === HistoryEventType.DRAFT_SAVED && lastEntry.documentContent === newEntry.documentContent) return prev;
             }
             const updatedHistory = [newEntry, ...prev].slice(0, 50);
-            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(updatedHistory));
             return updatedHistory;
         });
     }, [documentContent]);
 
-    const handleSaveDraft = useCallback((isAutoSave = false) => {
+    const handleSaveDraft = useCallback(async (isAutoSave = false) => {
+        if (!user) return;
         setSaveStatus('saving');
-        localStorage.setItem(LOCAL_STORAGE_KEY, documentContent);
-        addHistoryEntry(HistoryEventType.DRAFT_SAVED, isAutoSave ? 'Auto Save' : 'Manual Save');
-        if (!isAutoSave) {
-            setHasUnrefinedEdits(false);
-        }
-        setTimeout(() => {
-            setSaveStatus('saved');
-            setTimeout(() => setSaveStatus('idle'), 2000);
-        }, 500);
-    }, [addHistoryEntry, documentContent]);
-
-    useEffect(() => {
-        if (isInitialMount.current) {
-            isInitialMount.current = false;
-
-            const savedHistory = localStorage.getItem(HISTORY_STORAGE_KEY);
-            if (savedHistory) setHistory(JSON.parse(savedHistory));
+        
+        try {
+            // Update local history state first
+            let updatedHistory = history;
+            const newEntry: HistoryEntry = { id: `${HistoryEventType.DRAFT_SAVED}-${Date.now()}`, type: HistoryEventType.DRAFT_SAVED, timestamp: Date.now(), documentTitle: getDocumentTitle(documentContent), documentContent, details: isAutoSave ? 'Auto Save' : 'Manual Save' };
             
-            const savedContent = localStorage.getItem(LOCAL_STORAGE_KEY);
-            if (savedContent) {
-                setDocumentContent(savedContent);
-                setChatHistory([{ id: 'bot-welcome-back', sender: MessageSender.BOT, text: t('chat.welcomeBack') }]);
-                setView('editor');
-            } else {
-                setChatHistory([{ id: 'bot-initial-welcome', sender: MessageSender.BOT, text: t('chat.initialWelcome') }]);
+            let skipEntry = false;
+            if (isAutoSave) {
+                 const lastEntry = history[0];
+                 if (lastEntry && lastEntry.type === HistoryEventType.DRAFT_SAVED && lastEntry.documentContent === newEntry.documentContent) {
+                    skipEntry = true;
+                 }
             }
-        } else {
-            // On language change, update welcome messages if they exist to avoid overwriting chat history
-            setChatHistory(prev => {
-                if (prev.length > 0) {
-                    const firstMessage = prev[0];
-                    if (firstMessage.id === 'bot-welcome-back') {
-                        return [{...firstMessage, text: t('chat.welcomeBack')}, ...prev.slice(1)];
-                    }
-                    if (firstMessage.id === 'bot-initial-welcome') {
-                        return [{...firstMessage, text: t('chat.initialWelcome')}, ...prev.slice(1)];
-                    }
-                }
-                return prev;
-            });
+
+            if (!skipEntry) {
+                updatedHistory = [newEntry, ...history].slice(0, 50);
+                setHistory(updatedHistory);
+            }
+
+            // Save to Firestore
+            const userDocRef = doc(db, 'users', user.uid);
+            await setDoc(userDocRef, {
+                documentContent,
+                chatHistory,
+                history: updatedHistory,
+                lastUpdated: new Date()
+            }, { merge: true });
+
+            if (!isAutoSave) {
+                setHasUnrefinedEdits(false);
+            }
+            setTimeout(() => {
+                setSaveStatus('saved');
+                setTimeout(() => setSaveStatus('idle'), 2000);
+            }, 500);
+
+        } catch (err) {
+            console.error("Error saving draft:", err);
+            // Don't show error to user on auto-save to allow retry
+            if (!isAutoSave) setError(t('errors.saveFailed'));
+            setSaveStatus('idle');
         }
-    }, [t]);
+
+    }, [documentContent, chatHistory, history, user, t]);
 
     const handleContentChange = useCallback((newContent: string) => {
         setDocumentContent(newContent);
@@ -322,6 +378,14 @@ const App: React.FC = () => {
     const handleClearChat = useCallback(() => {
         setChatHistory(prev => prev.slice(0, 1));
     }, []);
+
+    if (authLoading) {
+        return <div className="flex h-screen items-center justify-center bg-[#0D0D0D] text-white">{t('common.loading')}</div>;
+    }
+
+    if (!user) {
+        return <LoginView />;
+    }
 
     return (
         <div className="flex flex-col h-screen font-sans bg-[#0D0D0D] text-[#F5F5F5]">

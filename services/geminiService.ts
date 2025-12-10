@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, GenerateContentParameters, GenerateContentResponse } from "@google/genai";
 import type { ChatMessage } from '../types';
 
 if (!process.env.API_KEY) {
@@ -8,9 +8,71 @@ if (!process.env.API_KEY) {
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 const model = "gemini-2.5-flash";
 
+/**
+ * Helper to parse clean error messages from Gemini JSON errors
+ */
+function getCleanErrorMessage(error: any): string {
+    let message = error.message || String(error);
+    try {
+        if (typeof message === 'string' && message.trim().startsWith('{')) {
+            const parsed = JSON.parse(message);
+            if (parsed.error && parsed.error.message) {
+                return parsed.error.message;
+            }
+        }
+    } catch (e) {
+        // ignore parsing error
+    }
+    return message;
+}
+
+/**
+ * Wraps the Gemini API call with retry logic for handling 503 (Overloaded) and 429 (Too Many Requests) errors.
+ * Uses exponential backoff with jitter.
+ */
+async function generateContentWithRetry(params: GenerateContentParameters, maxRetries = 5): Promise<GenerateContentResponse> {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await ai.models.generateContent(params);
+        } catch (error: any) {
+            lastError = error;
+            
+            const errorMessage = error?.message || '';
+            const status = error?.status || error?.code;
+            
+            // Check for 503 (Service Unavailable), 429 (Too Many Requests), or specific error text
+            const isRetryable = 
+                status === 503 || 
+                status === 429 ||
+                errorMessage.includes('503') || 
+                errorMessage.includes('429') ||
+                errorMessage.toLowerCase().includes('overloaded') ||
+                errorMessage.toLowerCase().includes('unavailable') ||
+                errorMessage.toLowerCase().includes('quota');
+
+            if (isRetryable && attempt < maxRetries) {
+                // Aggressive backoff: 2s, 4s, 8s, 16s, 32s
+                const baseDelay = 2000;
+                const delay = Math.pow(2, attempt) * baseDelay + (Math.random() * 1000); 
+                
+                console.warn(`Gemini API overloaded (Attempt ${attempt + 1}/${maxRetries}). Retrying in ${Math.round(delay)}ms...`);
+                
+                await new Promise(resolve => setTimeout(resolve, delay));
+                continue;
+            }
+            
+            // If it's not a retryable error, or we've hit max retries, throw immediately
+            throw error;
+        }
+    }
+    throw lastError;
+}
+
 async function callGemini(systemInstruction: string, userPrompt: string): Promise<string> {
     try {
-        const response = await ai.models.generateContent({
+        const response = await generateContentWithRetry({
           model,
           contents: userPrompt,
           config: {
@@ -19,14 +81,11 @@ async function callGemini(systemInstruction: string, userPrompt: string): Promis
           },
         });
         
-        return response.text.trim();
+        return response.text?.trim() || "";
 
-    } catch (error) {
+    } catch (error: any) {
         console.error("Error calling Gemini API:", error);
-        if (error instanceof Error) {
-            throw new Error(`Gemini API Error: ${error.message}`);
-        }
-        throw new Error("An unexpected error occurred while communicating with the Gemini API.");
+        throw new Error(`Gemini API Error: ${getCleanErrorMessage(error)}`);
     }
 }
 
@@ -129,7 +188,7 @@ Please generate the next guiding question in ${language} based on the document a
 `.trim();
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry({
       model,
       contents: fullPrompt,
       config: {
@@ -151,7 +210,9 @@ Please generate the next guiding question in ${language} based on the document a
       },
     });
     
-    const jsonText = response.text.trim();
+    const jsonText = response.text?.trim();
+    if (!jsonText) return [];
+
     const result = JSON.parse(jsonText);
     
     if (result && Array.isArray(result.questions)) {
@@ -161,9 +222,6 @@ Please generate the next guiding question in ${language} based on the document a
 
   } catch (error) {
     console.error("Error calling Gemini for question generation:", error);
-    if (error instanceof Error) {
-        throw new Error(`Gemini API Error: ${error.message}`);
-    }
-    throw new Error("An unexpected error occurred while generating guiding questions.");
+    throw new Error(`Gemini API Error: ${getCleanErrorMessage(error)}`);
   }
 }
