@@ -1,20 +1,30 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+Procurement Draft
 
-# Run and deploy your AI Studio app
+Create and edit procurement documents — RFx packages, NDAs — from scratch or from your company's own template.
 
-This contains everything you need to run your app locally.
+Why
 
-View your app in AI Studio: https://ai.studio/apps/drive/1IMaptDoJGh9lfyTvX5UakB7OY-SI65cS
+Every procurement team keeps a folder of documents that were good once. An RFP template from 2019. An NDA someone's lawyer approved before the company changed jurisdiction. The work isn't writing them — it's remembering what to change and catching what someone forgot to.
 
-## Run Locally
+This is structured drafting for those documents: the right sections, the right clauses, and an editor that knows what kind of document it's holding.
 
-**Prerequisites:**  Node.js
+What it does
+RFx drafting — RFI, RFP and RFQ packages with the sections that matter: scope, evaluation criteria and weighting, commercial response format, timeline
+Work from your template — start from the company's existing form rather than a generic one
+NDAs and vendor agreements — «mutual or unilateral; note governing law if the templates assume one»
+Structured editing — clause-level rather than free text, so revisions stay consistent across the document
+Stack
+React 19 · TypeScript · Vite
+Google Gemini (@google/genai)
+Firebase — «say what for: hosting, auth, document storage»
+Running locally
 
+Prerequisites: Node.js 20+
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Not legal advice
+
+Generated documents are drafts — a starting point for someone qualified to review, not a substitute for one. Templates are «drafted from public-standard structures». No client document is included in this repository.
+
+Background
+
+Built from the document work behind a mid-sized procurement function: RFx packages, NDAs and vendor contracts, drafted repeatedly and reviewed properly.
